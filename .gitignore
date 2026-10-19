@@ -1,0 +1,41 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+
+# Generated corpus and local databases
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Downloaded source checkout and temporary ingestion output
+.cache/
+.tmp/
+litellm-docs/
+*.partial
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

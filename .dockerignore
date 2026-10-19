@@ -1,0 +1,38 @@
+# Version control and local environments
+.git
+.gitignore
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python caches and test output
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Generated corpus, databases, and temporary files
+data/
+*.sqlite
+*.sqlite3
+*.db
+.cache/
+.tmp/
+litellm-docs/
+*.partial
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

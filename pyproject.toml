@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.28,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "litellm-docs-mcp"
+version = "0.1.0"
+description = "Local MCP server for semantic search over LiteLLM Markdown documentation"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "markdown-it-py>=4.2,<5",
+    "mcp>=2.3,<3",
+    "numpy>=2.5,<3",
+    "openai>=3.35,<4",
+    "PyYAML>=6.0,<7",
+    "tiktoken>=0.14,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1,<10",
+    "pytest-asyncio>=1.4,<2",
+    "pytest-cov>=7.1,<8",
+    "ruff>=0.17,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/litellm_docs_mcp"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
