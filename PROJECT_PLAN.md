@@ -15,10 +15,6 @@ The project does not include a hosted deployment, web interface, authentication 
 
 The OpenAI API key will be read only from the `OPENAI_API_KEY` environment variable. It will not be stored in source code, local data files, logs, Docker build arguments, Docker layers, or Git history. `.env.example` will document variable names without containing a secret.
 
-Key deadlines are:
-
-- **October 19, 2026:** project plan, repository scaffold, and access to the private GitHub repository.
-- **October 24, 2026:** complete implementation and final submission.
 
 ## Proposed Architecture
 
