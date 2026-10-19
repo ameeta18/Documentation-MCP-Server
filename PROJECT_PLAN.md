@@ -15,10 +15,17 @@ The project does not include a hosted deployment, web interface, authentication 
 
 The OpenAI API key will be read only from the `OPENAI_API_KEY` environment variable. It will not be stored in source code, local data files, logs, Docker build arguments, Docker layers, or Git history. `.env.example` will document variable names without containing a secret.
 
-Key deadlines are:
 
-- **October 19, 2026:** project plan, repository scaffold, and access to the private GitHub repository.
-- **October 24, 2026:** complete implementation and final submission.
+## Work Packages and Timeline
+
+| Date | Work package | Planned result |
+|---|---|---|
+| Oct 19 | Planning and repository setup | Final project plan, private repository access, safe scaffold, dependency configuration, and README outline |
+| Oct 20 | Ingestion and persistence | Recursive discovery, stable IDs, Markdown sectioning, embedding generation, SQLite schema, and independently executable ingestion command |
+| Oct 21 | Search and reranking | Query embeddings, NumPy cosine retrieval, custom reranker, and source-reference formatting |
+| Oct 22 | MCP server and container | Exactly two MCP tools available through Streamable HTTP in a local container |
+| Oct 23 | Full-corpus validation | Complete ingestion, automated tests, retrieval review, README instructions, and secret checks |
+| Oct 24 | Final verification and submission | Clean-clone installation, ingestion and container smoke test, final fixes, and submission |
 
 ## Proposed Architecture
 
@@ -123,17 +130,6 @@ The reranker will be deterministic: identical inputs and stored data will produc
 ```
 
 The package structure separates ingestion, processing, persistence, retrieval, reranking, and MCP tool definitions.
-
-## Work Packages and Timeline
-
-| Date | Work package | Planned result |
-|---|---|---|
-| Oct 19 | Planning and repository setup | Final project plan, private repository access, safe scaffold, dependency configuration, and README outline |
-| Oct 20 | Ingestion and persistence | Recursive discovery, stable IDs, Markdown sectioning, embedding generation, SQLite schema, and independently executable ingestion command |
-| Oct 21 | Search and reranking | Query embeddings, NumPy cosine retrieval, custom reranker, and source-reference formatting |
-| Oct 22 | MCP server and container | Exactly two MCP tools available through Streamable HTTP in a local container |
-| Oct 23 | Full-corpus validation | Complete ingestion, automated tests, retrieval review, README instructions, and secret checks |
-| Oct 24 | Final verification and submission | Clean-clone installation, ingestion and container smoke test, final fixes, and submission |
 
 ## Testing Approach
 
