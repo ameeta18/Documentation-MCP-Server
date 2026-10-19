@@ -35,7 +35,7 @@ For each document, ingestion will:
 1. derive a stable document ID from its repository-relative path;
 2. store the complete original Markdown text and source information;
 3. parse the document into heading-aware sections;
-4. split large sections into token-bounded chunks while keeping code and tables together where practical;
+4. split large sections into size-bounded chunks while preserving heading context and avoiding unnecessary splits inside fenced code blocks;
 5. create normalized embedding text without changing the stored original document;
 6. generate embeddings in batches; and
 7. store sections, metadata, and embeddings in SQLite.
@@ -44,7 +44,7 @@ Initial chunk-size and overlap settings will be chosen conservatively and valida
 
 ### Search and document retrieval
 
-At server startup, stored section vectors will be loaded from SQLite into a NumPy matrix. `search_docs` will embed the query, calculate cosine similarity against the stored vectors, and pass a larger candidate set to the custom reranker. The final results will include the document ID, repository-relative path, heading context, content excerpt, relevance score, and a commit-pinned GitHub URL. Source line ranges may be included when they can be produced reliably.
+At server startup, stored section vectors will be loaded from SQLite into a NumPy matrix. `search_docs` will embed the query, calculate cosine similarity against the stored vectors, and pass a larger candidate set to the custom reranker. The final results will include the document ID, repository-relative path, heading context, content excerpt, relevance score, and a commit-pinned GitHub URL.
 
 `get_doc` will query SQLite by `doc_id` and return the complete original Markdown text together with basic source metadata. An unknown ID will produce a clear not-found response.
 
@@ -72,11 +72,11 @@ A stable ID will be derived from each repository-relative document path. The ori
 
 ### Embeddings
 
-OpenAI `text-embedding-3-small` is the proposed embedding model, subject to validation with the supplied key. It offers a suitable balance of retrieval quality, storage size, and API cost for this corpus. Document sections and queries must use the same model and vector dimensions. Requests will be batched, and retries will be limited to transient failures.
+OpenAI `text-embedding-3-small` is the proposed embedding model, subject to validation with the supplied key. It offers a suitable balance of retrieval quality, storage size, and API cost for this corpus. Document sections and queries must use the same model and vector dimensions. Embedding requests will be batched and monitored to remain within the supplied API key's $20 usage limit. Retries will be limited to transient failures.
 
 ### Storage and retrieval
 
-SQLite will store ingestion information, complete documents, sections, and embedding vectors in one portable database. The server will load the stored vectors into NumPy and use exact cosine similarity. This avoids adding a separate vector database for a corpus of this size. If full-corpus measurements show that exact search is too slow, a SQLite vector extension can be considered, but it is not part of the initial design.
+SQLite will store ingestion information, complete documents, sections, and embedding vectors in one portable database. The server will load the stored vectors into NumPy and use exact cosine similarity. This avoids adding a separate vector database for a corpus of this size.
 
 ### Custom reranking
 
@@ -163,7 +163,7 @@ After the implementation is stable on fixtures, the full corpus will be ingested
 | OpenAI budget, rate limits, or temporary API failures interrupt ingestion | Use the smaller embedding model, batch requests, apply bounded retries, and keep failed runs from replacing a valid database where practical. |
 | Semantic results or reranking are not useful enough | Test representative LiteLLM questions, inspect candidate ordering, and adjust chunk settings and reranker weights based on observed results. |
 | MCP or container integration behaves differently from local Python execution | Add an integration test with the official SDK client and run a container smoke test from a clean build. |
-| The API key is exposed accidentally | Read it only from the runtime environment, exclude secret files from Git and Docker contexts, avoid logging configuration values, and inspect tracked files and image metadata before submission. |
+| The API key is exposed accidentally | Read it only from the runtime environment, exclude secret files from Git and Docker contexts, avoid logging configuration values, and inspect tracked files, Docker configuration, and Git history before submission. |
 
 ## Definition of Done
 
