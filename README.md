@@ -56,7 +56,7 @@ SQLite lookup -> complete original Markdown document
 
 The ingestion command creates a shallow Git checkout of `docs/`, records the resolved
 commit, and discovers Markdown files recursively. A local source-directory option is also
-available for tests and offline development.
+available for tests and local development.
 
 Markdown is split into heading-aware, size-bounded sections and embedded with
 `text-embedding-3-small`. The complete original documents remain unchanged.
@@ -215,7 +215,7 @@ python -m ruff format --check .
 Automated tests run locally without making external API requests. Coverage includes
 ingestion, Markdown processing, persistence, semantic retrieval, reranking, source
 references, and the two-tool MCP contract over Streamable HTTP. All unit and integration
-tests pass locally, and the Docker image was smoke-tested with the official MCP client.
+tests pass locally.
 
 ### Retrieval review
 
