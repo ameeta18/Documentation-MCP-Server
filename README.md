@@ -1,52 +1,75 @@
 # LiteLLM Documentation MCP Server
 
-> **Current status:** Planning and repository setup. The ingestion pipeline, search implementation, MCP server, tests, and container have not been implemented yet. Commands in this README are proposed interfaces and have not been verified.
-
 ## Project description
 
-This project will provide a local Python MCP server for searching the Markdown documentation in [`BerriAI/litellm-docs/docs`](https://github.com/BerriAI/litellm-docs/tree/main/docs).
+This project provides a local Python MCP server for searching the Markdown documentation
+under [`BerriAI/litellm-docs/docs`](https://github.com/BerriAI/litellm-docs/tree/main/docs).
 
-The finished system will:
+It recursively ingests every `.md` file under `docs/`, preserves each complete original
+document, creates searchable sections, generates embeddings, and stores the results in a
+local SQLite database. Ingestion runs independently from the MCP server.
 
-- recursively process every `.md` file under `docs/`, including subdirectories;
-- preserve the complete original Markdown documents;
-- create searchable sections and store their generated embeddings;
-- run ingestion independently from the server;
-- implement semantic search followed by a small custom reranker; and
-- run locally in a container using the official Model Context Protocol Python SDK.
+The server uses the official Model Context Protocol Python SDK and exposes exactly two tools:
 
-The MCP server will expose exactly two tools:
+- `search_docs(query, top_k)` performs semantic retrieval, applies the custom reranker, and
+  returns documentation sections with source references. `top_k` defaults to 5 and accepts
+  values from 1 to 20.
+- `get_doc(doc_id)` returns the complete original Markdown document stored during ingestion.
 
-- `search_docs(query, top_k)` searches documentation sections, applies the custom reranker, and returns source references.
-- `get_doc(doc_id)` returns the complete original Markdown document associated with an ingestion-assigned document ID.
+## Architecture
 
-No ingestion, health, statistics, or debugging tools will be exposed through MCP.
+Ingestion and serving are separate processes connected by the SQLite database:
 
-## Planned architecture
+```text
+INGESTION (run separately)
 
-Ingestion and serving are separate processes.
+LiteLLM docs/ repository
+        |
+        v
+Discover all Markdown files recursively
+        |
+        v
+Store each original document and create searchable sections
+        |
+        v
+Generate section embeddings
+        |
+        v
+SQLite database
+  - complete original documents
+  - searchable sections and metadata
+  - embedding vectors
 
-The planned ingestion command will create a temporary shallow Git checkout with sparse checkout configured for the `docs/` directory. It will record the resolved commit, discover `docs/**/*.md`, preserve each original document, split documents into searchable sections, generate OpenAI embeddings, and store the results in SQLite.
 
-The planned server will load stored vectors into NumPy and use cosine similarity for semantic retrieval. A deterministic local reranker will then apply smaller boosts for useful lexical signals such as query-term, title, heading, and exact-phrase matches. Search results will include document IDs, paths, heading context, and commit-pinned source URLs.
+MCP SERVER (reads the completed database)
 
-The proposed embedding model is `text-embedding-3-small`. This choice and the final chunking and reranking settings still need to be validated during implementation.
+search_docs(query, top_k)
+        |
+        v
+Embed query -> cosine similarity -> custom reranker -> ranked sections and sources
 
-Detailed design decisions and the implementation schedule are in [PROJECT_PLAN.md](PROJECT_PLAN.md).
+get_doc(doc_id)
+        |
+        v
+SQLite lookup -> complete original Markdown document
+```
 
-## Current repository contents
+The ingestion command creates a shallow Git checkout of `docs/`, records the resolved
+commit, and discovers Markdown files recursively. A local source-directory option is also
+available for tests and offline development.
 
-The repository currently contains:
+Markdown is split into heading-aware, size-bounded sections and embedded with
+`text-embedding-3-small`. The complete original documents remain unchanged.
 
-- the project plan and this README;
-- Python dependency metadata in `pyproject.toml`;
-- safe environment-variable documentation in `.env.example`;
-- Git and Docker exclusion rules; and
-- the initial Python package directory.
+SQLite stores the documents, sections, metadata, and embedding vectors. The server loads
+the vectors into NumPy for exact cosine search, then applies a deterministic reranker using
+semantic similarity and smaller lexical signals.
 
-## Proposed installation
+Detailed design decisions are recorded in [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
-Python 3.12 is the proposed runtime.
+## Installation
+
+Python 3.12 is the target runtime.
 
 Linux and macOS:
 
@@ -66,29 +89,28 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-The declared dependencies include the official MCP Python SDK, the OpenAI Python library, NumPy, Markdown parsing, and test tooling. SQLite support comes from the Python standard library. Dependency versions will be validated and pinned before submission.
-
 ## API key handling
 
-The OpenAI API key must be supplied only through the `OPENAI_API_KEY` environment variable. Do not put it in source code, `.env.example`, a real `.env` file, command output, logs, Docker build arguments, or Docker layers.
+The OpenAI API key is read from the `OPENAI_API_KEY` environment variable. Never commit the
+key or include it in the Docker image. Local environment files and generated databases are
+excluded through `.gitignore` and `.dockerignore`.
 
 Linux and macOS:
 
 ```bash
-export OPENAI_API_KEY="<provided-key>"
+read -s OPENAI_API_KEY
+export OPENAI_API_KEY
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:OPENAI_API_KEY = "<provided-key>"
+$env:OPENAI_API_KEY = Read-Host "OpenAI API key" -MaskInput
 ```
 
-The example values above are placeholders. `.gitignore` and `.dockerignore` provide additional protection for local secret files and generated data.
+## Ingestion
 
-## Proposed ingestion
-
-The intended command-line interface is:
+After exporting `OPENAI_API_KEY`, run:
 
 ```bash
 python -m litellm_docs_mcp.ingestion.cli \
@@ -97,40 +119,128 @@ python -m litellm_docs_mcp.ingestion.cli \
   --database ./data/docs.sqlite3
 ```
 
-The command will acquire the selected Git revision, process every Markdown file recursively under `docs/`, generate embeddings, and create the local SQLite database. The generated database will be excluded from Git.
-
-## Proposed startup
-
-The intended local development command is:
+For an existing local checkout containing a `docs/` directory:
 
 ```bash
+python -m litellm_docs_mcp.ingestion.cli \
+  --source-dir /path/to/local/litellm-docs \
+  --database ./data/docs.sqlite3
+```
+
+The command prints the resolved commit, document and section counts, embedding dimension,
+and prompt-token usage. It does not print the API key. The generated database is excluded
+from Git.
+
+The full-corpus ingestion produced the following results:
+
+| Measurement | Result |
+|---|---:|
+| Source commit | `245dd496cca7d0bcd4bb662d5a2e6a4326b1c3eb` |
+| Markdown documents | 953 |
+| Searchable sections | 13,193 |
+| Embedding dimensions | 1,536 |
+| Ingestion duration | 213.47 seconds |
+| Database size | 120.48 MiB |
+
+These measurements describe one ingestion run. They may change with the source commit,
+chunking settings, embedding model, or development machine.
+
+## Start the MCP server
+
+The server needs a completed database and `OPENAI_API_KEY`. Query text is embedded at search
+time, so `search_docs` requires network access to the OpenAI embeddings API.
+
+```bash
+export DOCS_MCP_DATABASE_PATH=./data/docs.sqlite3
 python -m litellm_docs_mcp.mcp_server.app
 ```
 
-The planned transport is Streamable HTTP through a published local container port. Port `8000` is currently a configuration default, not a verified endpoint.
+PowerShell:
 
-The expected container workflow is:
+```powershell
+$env:DOCS_MCP_DATABASE_PATH = ".\data\docs.sqlite3"
+python -m litellm_docs_mcp.mcp_server.app
+```
+
+The default MCP endpoint is `http://127.0.0.1:8000/mcp`. The host and port can be changed
+with `DOCS_MCP_HOST` and `DOCS_MCP_PORT`.
+
+## Run in Docker
+
+Build the image:
 
 ```bash
-docker build -t litellm-docs-mcp .
-docker run --rm -p 8000:8000 \
-  -e OPENAI_API_KEY \
-  -e DOCS_MCP_DATABASE_PATH=/app/data/docs.sqlite3 \
-  -v "$(pwd)/data:/app/data:ro" \
+docker build --tag litellm-docs-mcp .
+```
+
+Linux and macOS:
+
+```bash
+docker run --rm \
+  --publish 127.0.0.1:8000:8000 \
+  --env OPENAI_API_KEY \
+  --volume "$(pwd)/data:/app/data:ro" \
   litellm-docs-mcp
 ```
 
-The final command and MCP endpoint will be confirmed during container testing.
+Windows PowerShell:
 
-## Proposed testing
+```powershell
+docker run --rm `
+  --publish 127.0.0.1:8000:8000 `
+  --env OPENAI_API_KEY `
+  --volume "${PWD}/data:/app/data:ro" `
+  litellm-docs-mcp
+```
 
-The test suite will use small Markdown fixtures and fake deterministic embeddings for normal automated tests. Planned coverage includes recursive discovery, original-document preservation, stable document IDs, section relationships, semantic retrieval, reranking, source references, unknown document IDs, the exact two-tool MCP contract, secret exclusion, and a container smoke test.
+The image runs as a non-root user. The database is mounted read-only at
+`/app/data/docs.sqlite3`, and the API key is passed from the current shell at container
+startup. It is not included in the image.
+
+## Testing
+
+Run the automated suite:
+
+```bash
+python -m pytest
+```
+
+Run the style checks:
+
+```bash
+python -m ruff check .
+python -m ruff format --check .
+```
+
+Automated tests run locally without making external API requests. Coverage includes
+ingestion, Markdown processing, persistence, semantic retrieval, reranking, source
+references, and the two-tool MCP contract over Streamable HTTP. All unit and integration
+tests pass locally, and the Docker image was smoke-tested with the official MCP client.
+
+### Retrieval review
+
+A manual review used representative questions about model fallbacks, Azure OpenAI, virtual
+keys, and logging callbacks. All four searches returned relevant documentation within the
+top five results.
+
+| Question | Relevant result | Rank |
+|---|---|---:|
+| Model fallbacks | `docs/tutorials/model_fallbacks.md` | 1 |
+| Azure OpenAI | `docs/providers/azure/azure.md` | 1 |
+| Virtual keys | `docs/proxy/virtual_keys.md` | 5 |
+| Logging callbacks | `docs/observability/custom_callback.md` | 2 |
+
+The dedicated fallback and Azure OpenAI documentation ranked first. For virtual keys and
+logging callbacks, relevant general documentation appeared within the top five, although
+more specialized pages sometimes ranked higher. Source URLs were pinned to the ingested
+commit, and a returned document ID was successfully passed to `get_doc` to retrieve the
+complete original Markdown.
+
+This was a small practical review, not a formal retrieval benchmark.
 
 ## Roadmap
 
-- **October 19:** finalize the plan and repository scaffold, create the private GitHub repository, and grant reviewer access.
-- **October 20:** implement recursive ingestion, Markdown processing, embedding generation, and SQLite persistence.
-- **October 21:** implement semantic retrieval and custom reranking.
-- **October 22:** implement the two MCP tools and local container execution.
-- **October 23:** run full-corpus ingestion, automated tests, retrieval review, documentation checks, and secret checks.
-- **October 24:** complete clean-clone verification, final fixes, and submission.
+- Maintain compatibility with future LiteLLM documentation and MCP SDK changes.
+- Build a small labelled query set if more systematic retrieval-quality measurement is needed.
+- Consider incremental ingestion only if documentation refreshes become frequent enough to
+  justify the added complexity.
